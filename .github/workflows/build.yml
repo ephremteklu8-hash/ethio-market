@@ -19,7 +19,10 @@ jobs:
         with:
           channel: stable
 
-      - name: Create Flutter project files
+      - name: Remove old Android project
+        run: rm -rf android
+
+      - name: Create Flutter Android project
         run: flutter create --platforms=android .
 
       - name: Get dependencies
