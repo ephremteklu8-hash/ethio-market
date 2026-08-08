@@ -25,6 +25,13 @@ jobs:
       - name: Create Flutter Android project
         run: flutter create --platforms=android .
 
+      - name: Add Firebase configuration
+        env:
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
+        run: |
+          mkdir -p android/app
+          echo "$FIREBASE_CONFIG" > android/app/google-services.json
+
       - name: Get dependencies
         run: flutter pub get
 
