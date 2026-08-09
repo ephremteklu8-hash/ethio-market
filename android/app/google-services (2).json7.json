@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "249410594140",
+    "project_id": "ethio-market-eded0",
+    "storage_bucket": "ethio-market-eded0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:249410594140:android:74a07211b51630b660cd99",
+        "android_client_info": {
+          "package_name": "com.ethiomarket.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJQuJNO4yeicRL6JXMSmbs2waFm23g9qI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
