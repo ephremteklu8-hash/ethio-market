@@ -4,7 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase error: $e');
+  }
+
   runApp(const EthioMarketApp());
 }
 
@@ -17,7 +23,9 @@ class EthioMarketApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Ethio Market',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.green,
+        ),
         useMaterial3: true,
       ),
       home: const AuthPage(),
@@ -44,11 +52,13 @@ class _AuthPageState extends State<AuthPage> {
     final password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      showMessage('Please enter email and password.');
+      showMessage('Please enter email and password');
       return;
     }
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+    });
 
     try {
       if (isLogin) {
@@ -63,22 +73,24 @@ class _AuthPageState extends State<AuthPage> {
         );
       }
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const HomePage(),
-          ),
-        );
-      }
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const HomePage(),
+        ),
+      );
     } on FirebaseAuthException catch (e) {
-      showMessage(e.message ?? 'Authentication failed.');
+      showMessage(e.message ?? 'Authentication failed');
     } catch (e) {
-      showMessage('Something went wrong.');
+      showMessage('Firebase is not connected correctly');
     }
 
     if (mounted) {
-      setState(() => loading = false);
+      setState(() {
+        loading = false;
+      });
     }
   }
 
@@ -95,14 +107,16 @@ class _AuthPageState extends State<AuthPage> {
         title: const Text('Ethio Market'),
         centerTitle: true,
       ),
-      body: Center(
+      body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
+              const SizedBox(height: 30),
+
               const Icon(
                 Icons.storefront,
-                size: 80,
+                size: 90,
                 color: Colors.green,
               ),
 
@@ -144,19 +158,21 @@ class _AuthPageState extends State<AuthPage> {
 
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 52,
                 child: ElevatedButton(
                   onPressed: loading ? null : authenticate,
                   child: loading
                       ? const CircularProgressIndicator()
                       : Text(
                           isLogin ? 'Login' : 'Sign Up',
-                          style: const TextStyle(fontSize: 18),
+                          style: const TextStyle(
+                            fontSize: 18,
+                          ),
                         ),
                 ),
               ),
 
-              const SizedBox(height: 15),
+              const SizedBox(height: 12),
 
               TextButton(
                 onPressed: () {
@@ -189,19 +205,19 @@ class HomePage extends StatelessWidget {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
 
-              if (context.mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AuthPage(),
-                  ),
-                );
-              }
+              if (!context.mounted) return;
+
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AuthPage(),
+                ),
+              );
             },
+            icon: const Icon(Icons.logout),
           ),
         ],
       ),
