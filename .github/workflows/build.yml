@@ -21,6 +21,9 @@ jobs:
 
       - name: Create Android project
         run: flutter create --platforms=android .
+        - name: Set Android package name
+  run: |
+    sed -i 's/applicationId = "com.example.ethio_market"/applicationId = "com.ethiomarket.app"/' android/app/build.gradle.kts
 
       - name: Add Firebase configuration
         env:
