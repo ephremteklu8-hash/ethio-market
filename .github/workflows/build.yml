@@ -11,22 +11,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
 
+      - name: Fix project name
+        run: |
+          sed -i 's/^name:.*/name: ethio_market/' pubspec.yaml
+
       - name: Create fresh Flutter Android project
         run: |
           rm -rf android
-          flutter create --platforms=android .
+          flutter create --project-name ethio_market --platforms=android .
 
-      - name: Set package name
+      - name: Set Android package name
         run: |
-          sed -i 's/com.example.ethio_market/com.ethiomarket.app/g' android/app/build.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
+
+          old = "com.example.ethio_market"
+          new = "com.ethiomarket.app"
+
+          for path in Path("android").rglob("*"):
+              if path.is_file():
+                  try:
+                      text = path.read_text()
+                      if old in text:
+                          path.write_text(text.replace(old, new))
+                  except (UnicodeDecodeError, OSError):
+                      pass
+          PY
 
       - name: Add Firebase configuration
         env:
@@ -34,18 +52,13 @@ jobs:
         run: |
           printf '%s' "$FIREBASE_CONFIG" > android/app/google-services.json
 
-      - name: Add Google Services plugin
+      - name: Configure Google Services
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           settings = Path("android/settings.gradle.kts")
           text = settings.read_text()
-
-          text = text.replace(
-              'id("com.android.application") version',
-              'id("com.android.application") version'
-          )
 
           if 'com.google.gms.google-services' not in text:
               text = text.replace(
@@ -65,6 +78,24 @@ jobs:
               )
 
           app.write_text(text)
+          PY
+
+      - name: Verify Firebase package
+        run: |
+          python3 - <<'PY'
+          import json
+
+          with open("android/app/google-services.json") as f:
+              data = json.load(f)
+
+          package_name = data["client"][0]["client_info"]["android_client_info"]["package_name"]
+
+          print("Firebase package:", package_name)
+
+          if package_name != "com.ethiomarket.app":
+              raise Exception(
+                  "Firebase package must be com.ethiomarket.app"
+              )
           PY
 
       - name: Get packages
