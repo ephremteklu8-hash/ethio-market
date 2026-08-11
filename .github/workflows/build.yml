@@ -19,30 +19,41 @@ jobs:
         with:
           channel: stable
 
-      - name: Create clean Android project
+      - name: Create Android project
         run: |
-          rm -rf /tmp/ethio_market_android
-          flutter create \
-            --project-name ethio_market \
-            --org com.ethiomarket \
-            --platforms android \
-            /tmp/ethio_market_android
-
           rm -rf android
-          cp -R /tmp/ethio_market_android/android android
+          flutter create \
+            --platforms=android \
+            --org com.ethiomarket \
+            .
 
-      - name: Set application ID
+      - name: Set package name
         run: |
-          sed -i 's/com.ethiomarket.ethio_market/com.ethiomarket.app/g' android/app/build.gradle.kts
-          sed -i 's/com.example.ethio_market/com.ethiomarket.app/g' android/app/build.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
 
-          find android/app/src -type f \( -name "*.kt" -o -name "*.java" -o -name "*.xml" \) \
-            -exec sed -i 's/com.ethiomarket.ethio_market/com.ethiomarket.app/g' {} \;
+          old = "com.ethiomarket.ethio_market"
+          new = "com.ethiomarket.app"
+
+          for path in Path("android").rglob("*"):
+              if path.is_file():
+                  try:
+                      text = path.read_text()
+                      if old in text:
+                          path.write_text(text.replace(old, new))
+                  except (UnicodeDecodeError, OSError):
+                      pass
+          PY
 
       - name: Add Firebase configuration
         env:
           FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
         run: |
+          if [ -z "$FIREBASE_CONFIG" ]; then
+            echo "ERROR: FIREBASE_CONFIG secret is missing"
+            exit 1
+          fi
+
           printf '%s' "$FIREBASE_CONFIG" > android/app/google-services.json
 
       - name: Configure Google Services
@@ -51,46 +62,59 @@ jobs:
           from pathlib import Path
 
           settings = Path("android/settings.gradle.kts")
-          text = settings.read_text()
+          app = Path("android/app/build.gradle.kts")
 
-          if 'com.google.gms.google-services' not in text:
+          settings_text = settings.read_text()
+          app_text = app.read_text()
+
+          # Add Google Services plugin to settings.gradle.kts
+          if 'com.google.gms.google-services' not in settings_text:
               marker = 'id("org.jetbrains.kotlin.android")'
-              text = text.replace(
+
+              settings_text = settings_text.replace(
                   marker,
                   marker + '\n    id("com.google.gms.google-services") version "4.4.3" apply false'
               )
 
-          settings.write_text(text)
+          settings.write_text(settings_text)
 
-          app = Path("android/app/build.gradle.kts")
-          text = app.read_text()
-
-          if 'com.google.gms.google-services' not in text:
+          # Apply Google Services plugin to app
+          if 'com.google.gms.google-services' not in app_text:
               marker = 'id("org.jetbrains.kotlin.android")'
-              text = text.replace(
+
+              app_text = app_text.replace(
                   marker,
                   marker + '\n    id("com.google.gms.google-services")'
               )
 
-          app.write_text(text)
+          app.write_text(app_text)
           PY
 
-      - name: Verify Firebase package
+      - name: Verify Firebase
         run: |
           python3 - <<'PY'
           import json
 
-          with open("android/app/google-services.json") as f:
-              data = json.load(f)
+          file = "android/app/google-services.json"
 
-          package_name = data["client"][0]["client_info"]["android_client_info"]["package_name"]
+          with open(file, "r") as f:
+              config = json.load(f)
+
+          package_name = (
+              config["client"][0]
+              ["client_info"]
+              ["android_client_info"]
+              ["package_name"]
+          )
 
           print("Firebase package:", package_name)
 
           if package_name != "com.ethiomarket.app":
-              raise Exception(
-                  "Firebase package must be com.ethiomarket.app"
+              raise SystemExit(
+                  "ERROR: Firebase package must be com.ethiomarket.app"
               )
+
+          print("Firebase configuration OK")
           PY
 
       - name: Get dependencies
