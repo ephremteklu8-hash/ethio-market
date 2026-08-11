@@ -1,24 +1,109 @@
-name: ethio_market
-description: Ethio Market Flutter App
-publish_to: "none"
+name: Build Ethio Market APK
 
-version: 1.0.0+1
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
-environment:
-  sdk: ">=3.0.0 <4.0.0"
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-dependencies:
-  flutter:
-    sdk: flutter
- 
-  cupertino_icons: ^1.0.8
-  firebase_core: ^4.0.0
-  firebase_auth: ^6.0.0
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  flutter_lints: ^5.0.0
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
 
-flutter:
-  uses-material-design: true
+      - name: Create fresh Android project
+        run: |
+          rm -rf android
+          flutter create --platforms=android .
+
+      - name: Configure package name
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          old = "com.example.ethio_market"
+          new = "com.ethiomarket.app"
+
+          for path in Path("android").rglob("*"):
+              if path.is_file():
+                  try:
+                      text = path.read_text()
+                      if old in text:
+                          path.write_text(text.replace(old, new))
+                  except (UnicodeDecodeError, OSError):
+                      pass
+          PY
+
+      - name: Add Firebase configuration
+        env:
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
+        run: |
+          printf '%s' "$FIREBASE_CONFIG" > android/app/google-services.json
+
+      - name: Configure Google Services plugin
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          settings = Path("android/settings.gradle.kts")
+          text = settings.read_text()
+
+          if 'id("com.google.gms.google-services")' not in text:
+              marker = 'id("org.jetbrains.kotlin.android")'
+              text = text.replace(
+                  marker,
+                  marker + '\n    id("com.google.gms.google-services") version "4.4.3" apply false'
+              )
+
+          settings.write_text(text)
+
+          app = Path("android/app/build.gradle.kts")
+          text = app.read_text()
+
+          if 'id("com.google.gms.google-services")' not in text:
+              marker = 'id("org.jetbrains.kotlin.android")'
+              text = text.replace(
+                  marker,
+                  marker + '\n    id("com.google.gms.google-services")'
+              )
+
+          app.write_text(text)
+          PY
+
+      - name: Verify Firebase configuration
+        run: |
+          python3 - <<'PY'
+          import json
+
+          with open("android/app/google-services.json", "r") as f:
+              config = json.load(f)
+
+          package_name = config["client"][0]["client_info"]["android_client_info"]["package_name"]
+
+          print("Firebase package:", package_name)
+
+          if package_name != "com.ethiomarket.app":
+              raise SystemExit(
+                  "ERROR: Firebase package name is not com.ethiomarket.app"
+              )
+          PY
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethio-market-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
